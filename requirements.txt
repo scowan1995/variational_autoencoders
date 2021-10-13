@@ -1,0 +1,8 @@
+torch
+tensorboard
+torchvision
+optuna
+pandas
+numpy
+torchmetrics
+tqdm

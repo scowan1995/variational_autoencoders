@@ -69,7 +69,7 @@ class Decoder(nn.Module):
 
 class VAE(nn.Module):
 
-    def __init__(self, encoder_size, decoder_size, latent_size, input_size) -> None:
+    def __init__(self, encoder_size: int, decoder_size: int, latent_size: int, input_size: int) -> None:
         super(VAE, self).__init__()
         self.input_size = input_size
         self.encoder = Encoder(encoder_size, latent_size, input_size)
@@ -77,7 +77,7 @@ class VAE(nn.Module):
 
     def forward(self, x):
         batch_size = x.shape[0]
-        flattened = x.view(batch_size, mnist_size)
+        flattened = x.view(batch_size, self.input_size) # create shape batch_size X sample_length
         mu, logvar = self.encoder(flattened)
         z = torch.randn_like(mu)
         standard_deviation = torch.exp(0.5 * logvar)
@@ -85,14 +85,16 @@ class VAE(nn.Module):
         return reconstruction, raw, mu, logvar
         
 # Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(disentangling_param, raw_recon, x, mu, logvar):
+def loss_function(disentangling_param, raw_recon, x, mu, logvar, writer, epoch_num, input_size):
     # using the reconnstructionw ithout the sigmoid so I can use BCE with logits loss
     # this is mosre numerically stable and stops issues with recon[i] = 1
     l = torch.nn.BCEWithLogitsLoss(reduction='sum')
-    BCE = l(raw_recon, x.view(-1, 784))
+    BCE = l(raw_recon, x.view(-1, input_size))
 
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
+    writer.add_scalar("BCE", BCE, epoch_num)
+    writer.add_scalar("KLD", disentangling_param * KLD, epoch_num)
     return BCE + (disentangling_param * KLD)
 
 def train(num_epochs: int, dataloader, model, loss_fn, optimizer, comment=""):
@@ -121,16 +123,17 @@ def train(num_epochs: int, dataloader, model, loss_fn, optimizer, comment=""):
                 recon = recon.unsqueeze(1)
                 recon_grid = torchvision.utils.make_grid(recon)
                 writer.add_image(f'{epoch}_recon', recon_grid, global_step=epoch)
-            loss = loss_fn(raw, images, mu, logvar)
+            global_step = (epoch * len(dataloader) + batch_idx)
+            loss = loss_fn(raw, images, mu, logvar, writer, global_step, input_size=28 * 28)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             loss_val = loss.detach().cpu().item()
             running_loss += loss_val
-            global_step = (epoch * len(dataloader) + batch_idx)
             writer.add_scalar("loss", loss_val, global_step)
         mel = running_loss / (dataloader_size * bsize)
+        print(mel)
         writer.add_scalar("mean epoch loss", mel, epoch)
     return mel
 
