@@ -1,10 +1,11 @@
 from vae import VAE
+import torch
 from torchtext.datasets import IMDB
 from torch.utils.data import Dataset, DataLoader
 
 class TorchTextDataset:
 
-    def __init__(split: str, vectorizer):
+    def __init__(self, split, vectorizer):
         _data = IMDB(split=split)
         self.data = [(label, line) for label, line in _data]
         self.vectorizer = vectorizer
@@ -26,12 +27,13 @@ class Vocabulary:
 
     def __init__(self, split, tokenizer):
         dataset = IMDB(split=split)
+        self.tokenizer = tokenizer
         self.vocab = self._create_vocab(dataset)
 
-    def _create_vocab(self):
+    def _create_vocab(self, data):
         vocab_dict = {}
         next_idx = 0
-        for _, line in self.data:
+        for _, line in data:
             for token in self.tokenizer(line):
                 if token not in vocab_dict:
                     vocab_dict[token] = next_idx
@@ -45,7 +47,7 @@ class WordCountVectorizer:
         self.tokenizer = tokenizer
 
     def __call__(self, data: str):
-        wordcounts = torch.zeros(len(vocab))
+        wordcounts = torch.zeros(len(self.vocab))
         for token in self.tokenizer(data):
             if token in self.vocab:
                 wordcounts[self.vocab[token]] += 1
@@ -59,8 +61,11 @@ def tokenizer(data: str):
 
 def main():
     print("in main")
-    vocab = Vocabulary(split="train", tokenizer=tokenizer)
-    vectorizer = WordCountVectorizer(vocab, tookenizer)
+    vocab_obj = Vocabulary(split="train", tokenizer=tokenizer)
+    vocab = vocab_obj.vocab
+    
+    vectorizer = WordCountVectorizer(vocab, tokenizer)
+    print("creating dataset")
     dataset = TorchTextDataset(split="train", vectorizer=vectorizer)
     for i in range(4):
         print(dataset[i])
@@ -70,3 +75,4 @@ def main():
 
     # train and log each epoch
 
+main()
