@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 
 class Encoder(nn.Module):
@@ -26,10 +27,10 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, decoder_hidden_size, latent_space_size) -> None:
+    def __init__(self, decoder_hidden_size, latent_space_size, output_size) -> None:
         super(Decoder, self).__init__()
         self.l1 = nn.Linear(latent_space_size, decoder_hidden_size)
-        self.l2 = nn.Linear(decoder_hidden_size, mnist_size)
+        self.l2 = nn.Linear(decoder_hidden_size, output_size)
         self.activation = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
@@ -47,7 +48,7 @@ class VAE(nn.Module):
         super(VAE, self).__init__()
         self.input_size = input_size
         self.encoder = Encoder(encoder_size, latent_size, input_size)
-        self.decoder = Decoder(decoder_size, latent_size)
+        self.decoder = Decoder(decoder_size, latent_size, input_size)
 
     def forward(self, x):
         batch_size = x.shape[0]
@@ -62,8 +63,7 @@ class VAE(nn.Module):
 def loss_function(disentangling_param, raw_recon, x, mu, logvar, writer, epoch_num, input_size):
     # using the reconnstructionw ithout the sigmoid so I can use BCE with logits loss
     # this is mosre numerically stable and stops issues with recon[i] = 1
-    l = torch.nn.BCEWithLogitsLoss(reduction='sum')
-    BCE = l(raw_recon, x.view(-1, input_size))
+    BCE = F.binary_cross_entropy(raw_recon, x.view(-1, input_size))
 
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
